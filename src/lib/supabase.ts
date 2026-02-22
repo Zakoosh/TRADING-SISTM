@@ -4,20 +4,32 @@ import { AIAnalysis, EvaluationScore, SimulatorTrade, WatchlistItem, UserSetting
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-  realtime: {
-    params: { eventsPerSecond: 10 },
-  },
-})
+const supabaseConfigured = !!(
+  supabaseUrl &&
+  supabaseAnonKey &&
+  supabaseUrl !== 'your_supabase_url' &&
+  supabaseAnonKey !== 'your_supabase_anon_key'
+)
+
+const fallbackSupabaseUrl = 'https://placeholder.supabase.co'
+const fallbackSupabaseAnonKey = 'placeholder-anon-key'
+
+export const supabase = createClient(
+  supabaseConfigured ? supabaseUrl : fallbackSupabaseUrl,
+  supabaseConfigured ? supabaseAnonKey : fallbackSupabaseAnonKey,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+    realtime: {
+      params: { eventsPerSecond: 10 },
+    },
+  }
+)
 
 export function isSupabaseConfigured(): boolean {
-  return !!(supabaseUrl && supabaseAnonKey &&
-    supabaseUrl !== 'your_supabase_url' &&
-    supabaseAnonKey !== 'your_supabase_anon_key')
+  return supabaseConfigured
 }
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
