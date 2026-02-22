@@ -252,6 +252,68 @@ DO $$ BEGIN
 END $$;
 
 -- ============================================================
+-- 10. قائمة الأسهم المتاحة (Available Stocks Catalog)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS stocks (
+  id       UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  symbol   TEXT NOT NULL UNIQUE,
+  name     TEXT NOT NULL,
+  market   TEXT NOT NULL CHECK (market IN ('US','TR','CRYPTO','COMMODITY','INDEX')),
+  currency TEXT NOT NULL DEFAULT 'USD'
+);
+
+ALTER TABLE stocks ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='stocks' AND policyname='read_stocks') THEN
+    CREATE POLICY read_stocks ON stocks FOR SELECT USING (true);
+  END IF;
+END $$;
+
+-- Seed default stocks
+INSERT INTO stocks (symbol, name, market, currency) VALUES
+  ('AAPL',     'Apple Inc.',              'US',        'USD'),
+  ('MSFT',     'Microsoft Corp.',         'US',        'USD'),
+  ('GOOGL',    'Alphabet Inc.',           'US',        'USD'),
+  ('AMZN',     'Amazon.com Inc.',         'US',        'USD'),
+  ('NVDA',     'NVIDIA Corp.',            'US',        'USD'),
+  ('META',     'Meta Platforms',          'US',        'USD'),
+  ('TSLA',     'Tesla Inc.',              'US',        'USD'),
+  ('JPM',      'JPMorgan Chase',          'US',        'USD'),
+  ('V',        'Visa Inc.',               'US',        'USD'),
+  ('WMT',      'Walmart Inc.',            'US',        'USD'),
+  ('GARAN.IS', 'Garanti Bankası',         'TR',        'TRY'),
+  ('AKBNK.IS', 'Akbank',                  'TR',        'TRY'),
+  ('THYAO.IS', 'Türk Hava Yolları',       'TR',        'TRY'),
+  ('EREGL.IS', 'Ereğli Demir Çelik',      'TR',        'TRY'),
+  ('SISE.IS',  'Şişecam',                 'TR',        'TRY'),
+  ('BIMAS.IS', 'BIM Birleşik Mağazalar',  'TR',        'TRY'),
+  ('ARCLK.IS', 'Arçelik A.Ş.',            'TR',        'TRY'),
+  ('KCHOL.IS', 'Koç Holding',             'TR',        'TRY'),
+  ('TCELL.IS', 'Turkcell',                'TR',        'TRY'),
+  ('SAHOL.IS', 'Sabancı Holding',         'TR',        'TRY'),
+  ('BTC/USD',  'Bitcoin',                 'CRYPTO',    'USD'),
+  ('ETH/USD',  'Ethereum',                'CRYPTO',    'USD'),
+  ('BNB/USD',  'BNB',                     'CRYPTO',    'USD'),
+  ('SOL/USD',  'Solana',                  'CRYPTO',    'USD'),
+  ('XRP/USD',  'XRP',                     'CRYPTO',    'USD'),
+  ('ADA/USD',  'Cardano',                 'CRYPTO',    'USD'),
+  ('DOGE/USD', 'Dogecoin',                'CRYPTO',    'USD'),
+  ('AVAX/USD', 'Avalanche',               'CRYPTO',    'USD'),
+  ('XAU/USD',  'Gold',                    'COMMODITY', 'USD'),
+  ('XAG/USD',  'Silver',                  'COMMODITY', 'USD'),
+  ('WTI/USD',  'Crude Oil WTI',           'COMMODITY', 'USD'),
+  ('BRENT',    'Brent Oil',               'COMMODITY', 'USD'),
+  ('XPT/USD',  'Platinum',                'COMMODITY', 'USD'),
+  ('SPX',      'S&P 500',                 'INDEX',     'USD'),
+  ('DJI',      'Dow Jones',               'INDEX',     'USD'),
+  ('IXIC',     'NASDAQ',                  'INDEX',     'USD'),
+  ('FTSE',     'FTSE 100',                'INDEX',     'GBP'),
+  ('DAX',      'DAX',                     'INDEX',     'EUR'),
+  ('XU100',    'BIST 100',                'INDEX',     'TRY')
+ON CONFLICT (symbol) DO NOTHING;
+
+-- ============================================================
 -- Real-time subscriptions (enable for live updates)
 -- ============================================================
 ALTER PUBLICATION supabase_realtime ADD TABLE ai_analyses;

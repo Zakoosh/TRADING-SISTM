@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Layout } from '@/components/layout/Layout'
 import Home from '@/pages/Home'
@@ -69,7 +69,7 @@ function AppInit() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <AppInit />
         <Routes>
           <Route path="/" element={<Layout />}>
@@ -81,6 +81,7 @@ export default function App() {
             <Route path="trading" element={<RealTrading />} />
             <Route path="reports" element={<Reports />} />
             <Route path="admin" element={<Admin />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>
