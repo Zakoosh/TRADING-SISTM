@@ -24,7 +24,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   alpacaApiKey: '',
   alpacaSecretKey: '',
   alpacaMode: 'PAPER',
-  geminiApiKey: '',
+  openaiApiKey: '',
   twelveDataApiKey: '',
 }
 
@@ -135,26 +135,27 @@ export default function Admin() {
       {/* API Keys Section */}
       {activeSection === 'api' && (
         <div className="space-y-4">
-          {/* Gemini */}
+          {/* OpenAI */}
           <Card className="glass">
             <CardHeader>
               <CardTitle className="text-sm flex items-center gap-2">
-                🤖 Gemini AI API
+                🤖 OpenAI (ChatGPT) API
                 <Badge variant="secondary">تحليل الذكاء الاصطناعي</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Gemini API Key</label>
+                <label className="text-xs text-muted-foreground mb-1 block">OpenAI API Key</label>
                 <PasswordInput
-                  value={form.geminiApiKey || ''}
-                  onChange={v => update('geminiApiKey', v)}
-                  placeholder="AIza..."
+                  value={form.openaiApiKey || ''}
+                  onChange={v => update('openaiApiKey', v)}
+                  placeholder="sk-proj-..."
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                احصل على مفتاح Gemini من Google AI Studio. مجاني للاستخدام الشخصي.
-              </p>
+              <div className="p-2 rounded bg-accent/30 text-xs text-muted-foreground space-y-1">
+                <p>• النموذج المستخدم: <strong>gpt-4o-mini</strong> (سريع واقتصادي)</p>
+                <p>• تحليل ذكي عربي كامل مع RSI/MACD/ADX</p>
+              </div>
             </CardContent>
           </Card>
 
@@ -172,12 +173,14 @@ export default function Admin() {
                 <PasswordInput
                   value={form.twelveDataApiKey || ''}
                   onChange={v => update('twelveDataApiKey', v)}
-                  placeholder="your_twelve_data_key"
+                  placeholder="fc704d2d..."
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                توفر بيانات حية للأسهم الأمريكية والتركية والعملات الرقمية.
-              </p>
+              <div className="p-2 rounded bg-accent/30 text-xs text-muted-foreground space-y-1">
+                <p>• الخطة الحالية: <strong>Basic (800 كريدت/يوم، 8 طلب/دقيقة)</strong></p>
+                <p>• النظام يُطبّق Rate Limiting تلقائياً (8.5 ثانية بين الطلبات)</p>
+                <p>• يستخدم كاش 5 دقائق لتقليل الاستهلاك</p>
+              </div>
             </CardContent>
           </Card>
 
@@ -379,7 +382,7 @@ export default function Admin() {
               { label: 'إجمالي التحليلات المحفوظة', value: analyses.length },
               { label: 'إجمالي التقييمات', value: evaluationScores.length },
               { label: 'إجمالي الصفقات (محاكاة)', value: simulatorTrades.length },
-              { label: 'حالة Gemini AI', value: import.meta.env.VITE_GEMINI_API_KEY ? '✅ مُهيأ' : '⚠️ غير مُهيأ' },
+              { label: 'حالة OpenAI (ChatGPT)', value: import.meta.env.VITE_OPENAI_API_KEY ? '✅ مُهيأ' : '⚠️ غير مُهيأ' },
               { label: 'حالة Twelve Data', value: import.meta.env.VITE_TWELVE_DATA_API_KEY ? '✅ مُهيأ' : '⚠️ غير مُهيأ' },
               { label: 'حالة Alpaca', value: import.meta.env.VITE_ALPACA_API_KEY ? '✅ مُهيأ' : '⚠️ غير مُهيأ' },
             ].map(item => (

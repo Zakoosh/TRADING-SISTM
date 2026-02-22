@@ -211,7 +211,7 @@ export interface UserSettings {
   alpacaApiKey?: string;
   alpacaSecretKey?: string;
   alpacaMode: 'PAPER' | 'LIVE';
-  geminiApiKey?: string;
+  openaiApiKey?: string;
   twelveDataApiKey?: string;
 }
 

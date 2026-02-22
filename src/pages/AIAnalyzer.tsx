@@ -6,8 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAppStore } from '@/store'
-import { analyzeStockWithAI } from '@/lib/gemini'
-import { DEFAULT_STOCKS, fetchMarketData } from '@/lib/marketData'
+import { analyzeStockWithAI } from '@/lib/openai'
+import { DEFAULT_STOCKS, fetchMarketData, getRemainingCredits, isTwelveDataConfigured } from '@/lib/marketData'
 import { sendStatusUpdate } from '@/lib/telegram'
 import { saveAnalysis } from '@/lib/supabase'
 import { cn, formatCurrency, formatPercent, getSignalBg, formatDate } from '@/lib/utils'
@@ -226,8 +226,25 @@ export default function AIAnalyzer() {
     avgConfidence: analyses.length > 0 ? analyses.reduce((s, a) => s + a.confidence, 0) / analyses.length : 0,
   }
 
+  const remainingCredits = getRemainingCredits()
+  const tdConfigured = isTwelveDataConfigured()
+
   return (
     <div className="space-y-6">
+      {/* API Status Bar */}
+      <div className="flex flex-wrap gap-3 text-xs">
+        <div className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full border',
+          tdConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
+        )}>
+          📈 Twelve Data: {tdConfigured ? `${remainingCredits} كريدت متبقي اليوم` : 'غير مُهيأ (بيانات تجريبية)'}
+        </div>
+        <div className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full border',
+          import.meta.env.VITE_OPENAI_API_KEY ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
+        )}>
+          🤖 OpenAI: {import.meta.env.VITE_OPENAI_API_KEY ? 'gpt-4o-mini ✅' : 'غير مُهيأ (تحليل محلي)'}
+        </div>
+      </div>
+
       {/* Controls */}
       <Card className="glass">
         <CardContent className="p-4">

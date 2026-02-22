@@ -3,7 +3,7 @@
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string
   readonly VITE_SUPABASE_ANON_KEY: string
-  readonly VITE_GEMINI_API_KEY: string
+  readonly VITE_OPENAI_API_KEY: string
   readonly VITE_TWELVE_DATA_API_KEY: string
   readonly VITE_ALPACA_API_KEY: string
   readonly VITE_ALPACA_SECRET_KEY: string
