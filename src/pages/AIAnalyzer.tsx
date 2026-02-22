@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAppStore } from '@/store'
-import { analyzeStockWithAI, analyzeMultipleStocks } from '@/lib/gemini'
+import { analyzeStockWithAI } from '@/lib/gemini'
 import { DEFAULT_STOCKS, fetchMarketData } from '@/lib/marketData'
 import { sendStatusUpdate } from '@/lib/telegram'
+import { saveAnalysis } from '@/lib/supabase'
 import { cn, formatCurrency, formatPercent, getSignalBg, formatDate } from '@/lib/utils'
 import { AIAnalysis, MarketType } from '@/types'
 
@@ -147,7 +148,7 @@ function AnalysisCard({ analysis, expanded, onToggle }: {
 }
 
 export default function AIAnalyzer() {
-  const { analyses, addAnalysis, setIsAnalyzing, isAnalyzing, autoAnalysisActive, setAutoAnalysisActive } = useAppStore()
+  const { analyses, addAnalysis, setIsAnalyzing, isAnalyzing, autoAnalysisActive, setAutoAnalysisActive, user } = useAppStore()
   const [selectedMarket, setSelectedMarket] = useState<MarketType>('US')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
@@ -180,6 +181,8 @@ export default function AIAnalyzer() {
         const analysis = await analyzeStockWithAI(stock.symbol, stock.name, targetMarket, stock.price)
         results.push(analysis)
         addAnalysis(analysis)
+        // Save to Supabase in background
+        if (user?.id) saveAnalysis(analysis, user.id).catch(console.warn)
         setProgress(40 + ((i + 1) / stocksWithPrices.length) * 50)
         await new Promise(r => setTimeout(r, 300))
       }

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAppStore } from '@/store'
 import { fetchStockPrice, DEFAULT_STOCKS } from '@/lib/marketData'
 import { sendTradeNotification } from '@/lib/telegram'
+import { saveSimulatorTrade } from '@/lib/supabase'
 import { cn, formatCurrency, formatPercent, getChangeColor } from '@/lib/utils'
 import { SimulatorTrade, MarketType } from '@/types'
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
@@ -17,7 +18,7 @@ import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianG
 const INITIAL_CAPITAL = 100000
 
 export default function Simulator() {
-  const { simulatorTrades, addSimulatorTrade, setSimulatorTrades, simulatorCash, setSimulatorCash, analyses } = useAppStore()
+  const { simulatorTrades, addSimulatorTrade, setSimulatorTrades, simulatorCash, setSimulatorCash, analyses, user } = useAppStore()
   const [newTradeOpen, setNewTradeOpen] = useState(false)
   const [selectedSymbol, setSelectedSymbol] = useState('')
   const [selectedMarket, setSelectedMarket] = useState<MarketType>('US')
@@ -90,6 +91,9 @@ export default function Simulator() {
     } else {
       setSimulatorCash(simulatorCash + total)
     }
+
+    // Save to Supabase in background
+    if (user?.id) saveSimulatorTrade(trade, user.id).catch(console.warn)
 
     // Send Telegram notification
     await sendTradeNotification(selectedSymbol, tradeType, qty, currentPrice, total, 'SIMULATOR')
