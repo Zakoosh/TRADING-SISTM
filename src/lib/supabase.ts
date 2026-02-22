@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { AIAnalysis, EvaluationScore, SimulatorTrade, WatchlistItem, UserSettings } from '../types'
+import { AIAnalysis, EvaluationScore, MarketType, SimulatorTrade, WatchlistItem, UserSettings } from '../types'
+import { getAllDefaultStocks } from './marketData'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
@@ -100,6 +101,30 @@ export async function removeWatchlistItem(userId: string, symbol: string): Promi
     .eq('symbol', symbol)
   if (error) { console.error('removeWatchlistItem:', error); return false }
   return true
+}
+
+// ─── Available Stocks Catalog ─────────────────────────────────────────────────
+
+export async function fetchAvailableStocks(): Promise<Array<{ symbol: string; name: string; market: MarketType; currency: string }>> {
+  if (!isSupabaseConfigured()) return getAllDefaultStocks()
+  const { data, error } = await supabase
+    .from('stocks')
+    .select('symbol, name, market, currency')
+    .order('market')
+  if (error) {
+    console.warn('fetchAvailableStocks: error fetching from database, using defaults', error.message)
+    return getAllDefaultStocks()
+  }
+  if (!data || data.length === 0) {
+    // Table exists but is empty - seed with defaults
+    return getAllDefaultStocks()
+  }
+  return data.map(d => ({
+    symbol: d.symbol,
+    name: d.name,
+    market: d.market as MarketType,
+    currency: d.currency,
+  }))
 }
 
 // ─── AI Analyses ──────────────────────────────────────────────────────────────
