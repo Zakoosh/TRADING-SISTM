@@ -86,6 +86,7 @@ export interface SimulatorTrade {
   user_id: string;
   symbol: string;
   name: string;
+  market: MarketType;
   type: 'BUY' | 'SELL';
   quantity: number;
   price: number;

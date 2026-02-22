@@ -11,16 +11,27 @@ import { cn, formatCurrency, formatPercent, getChangeColor, getSignalBg } from '
 import { Stock } from '@/types'
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts'
 
+type StatColor = 'primary' | 'green' | 'red' | 'blue' | 'yellow'
+
+const COLOR_MAP: Record<StatColor, { bg: string; text: string }> = {
+  primary: { bg: 'bg-primary/10',    text: 'text-primary' },
+  green:   { bg: 'bg-green-500/10',  text: 'text-green-500' },
+  red:     { bg: 'bg-red-500/10',    text: 'text-red-500' },
+  blue:    { bg: 'bg-blue-500/10',   text: 'text-blue-500' },
+  yellow:  { bg: 'bg-yellow-500/10', text: 'text-yellow-500' },
+}
+
 function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'primary' }: {
   title: string; value: string; subtitle?: string; icon: React.ElementType;
-  trend?: number; color?: string
+  trend?: number; color?: StatColor
 }) {
+  const { bg, text } = COLOR_MAP[color] ?? COLOR_MAP.primary
   return (
     <Card className="glass hover:glow-green transition-all duration-300">
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <div className={cn('p-2 rounded-lg', `bg-${color}/10`)}>
-            <Icon className={cn('w-5 h-5', `text-${color}`)} />
+          <div className={cn('p-2 rounded-lg', bg)}>
+            <Icon className={cn('w-5 h-5', text)} />
           </div>
           {trend !== undefined && (
             <span className={cn('text-sm font-medium', getChangeColor(trend))}>
@@ -111,14 +122,14 @@ export default function Home() {
           value={analyses.length.toString()}
           subtitle={`${recentAnalyses.length} في الساعة الأخيرة`}
           icon={Brain}
-          color="blue-500"
+          color="blue"
         />
         <StatCard
           title="الإشارات القوية"
           value={strongSignals.toString()}
           subtitle={`متوسط الدرجات: ${avgScore.toFixed(0)}/100`}
           icon={Activity}
-          color="green-500"
+          color="green"
         />
         <StatCard
           title="الأرباح الإجمالية"
@@ -126,7 +137,7 @@ export default function Home() {
           subtitle={`${closedTrades.length} صفقة مغلقة`}
           icon={totalPnl >= 0 ? TrendingUp : TrendingDown}
           trend={totalPnl / 100000 * 100}
-          color={totalPnl >= 0 ? 'green-500' : 'red-500'}
+          color={totalPnl >= 0 ? 'green' : 'red'}
         />
       </div>
 

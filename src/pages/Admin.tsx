@@ -322,19 +322,26 @@ export default function Admin() {
             </div>
             <div className="space-y-3">
               {[
-                { label: 'Bot 1 - التقارير', token: '8382222457:AAGN8IEwtE_l_FPfhAJ4S7yq2NH2lkvV_qw' },
-                { label: 'Bot 2 - حالة النظام', token: '8435452935:AAHbJw0j0hh23bSedQkVB9eEGqgzEPXhooM' },
-                { label: 'Bot 3 - الصفقات', token: '8519827284:AAG9o0DvzFRJ7mQFxLGBf5DhWLTIQOH3lIk' },
-              ].map(bot => (
-                <div key={bot.label} className="p-3 rounded-lg bg-accent/30 border border-border">
-                  <div className="text-sm font-medium mb-1">{bot.label}</div>
-                  <div className="text-xs font-mono text-muted-foreground">{bot.token.slice(0, 20)}...</div>
-                  <Badge variant="success" className="mt-1 text-xs">مُهيأ</Badge>
-                </div>
-              ))}
+                { label: 'Bot 1 - التقارير', envKey: 'VITE_TELEGRAM_BOT_REPORTS_TOKEN' },
+                { label: 'Bot 2 - حالة النظام', envKey: 'VITE_TELEGRAM_BOT_STATUS_TOKEN' },
+                { label: 'Bot 3 - الصفقات', envKey: 'VITE_TELEGRAM_BOT_TRADES_TOKEN' },
+              ].map(bot => {
+                const configured = !!import.meta.env[bot.envKey]
+                return (
+                  <div key={bot.label} className="p-3 rounded-lg bg-accent/30 border border-border">
+                    <div className="text-sm font-medium mb-1">{bot.label}</div>
+                    <div className="text-xs font-mono text-muted-foreground">{bot.envKey}</div>
+                    <Badge variant={configured ? 'success' : 'secondary'} className="mt-1 text-xs">
+                      {configured ? 'مُهيأ' : 'غير مُهيأ'}
+                    </Badge>
+                  </div>
+                )
+              })}
               <div className="p-3 rounded-lg bg-accent/30 border border-border">
                 <div className="text-sm font-medium mb-1">Chat ID المشترك</div>
-                <div className="text-xs font-mono text-muted-foreground">6980352639</div>
+                <div className="text-xs font-mono text-muted-foreground">
+                  {import.meta.env.VITE_TELEGRAM_CHAT_ID ? '••••••••••' : 'غير مُهيأ'}
+                </div>
               </div>
             </div>
           </CardContent>

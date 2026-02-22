@@ -195,6 +195,7 @@ export async function fetchSimulatorTrades(userId: string): Promise<SimulatorTra
   if (error) { console.error('fetchSimulatorTrades:', error); return [] }
   return (data || []).map(d => ({
     id: d.id, user_id: d.user_id, symbol: d.symbol, name: d.name,
+    market: (d.market || 'US') as import('../types').MarketType,
     type: d.type, quantity: d.quantity, price: d.price, total: d.total,
     status: d.status, closePrice: d.close_price, pnl: d.pnl,
     pnlPercent: d.pnl_percent, closedAt: d.closed_at,

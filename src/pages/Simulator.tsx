@@ -76,6 +76,7 @@ export default function Simulator() {
       user_id: 'local',
       symbol: selectedSymbol,
       name: stockInfo?.name || selectedSymbol,
+      market: selectedMarket,
       type: tradeType,
       quantity: qty,
       price: currentPrice,
@@ -105,7 +106,7 @@ export default function Simulator() {
   }, [selectedSymbol, quantity, currentPrice, tradeType, simulatorCash, addSimulatorTrade, setSimulatorCash])
 
   const closeTrade = useCallback(async (trade: SimulatorTrade) => {
-    const closePrice = await fetchStockPrice(trade.symbol, 'US' as MarketType)
+    const closePrice = await fetchStockPrice(trade.symbol, trade.market)
     const pnl = (closePrice - trade.price) * trade.quantity * (trade.type === 'BUY' ? 1 : -1)
     const pnlPercent = (pnl / trade.total) * 100
 

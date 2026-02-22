@@ -351,9 +351,9 @@ export default function RealTrading() {
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">الرمز</th>
-                      <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">النوع</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">الجانب</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">الكمية</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">النوع</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">نوع الأمر</th>
                       <th className="text-center px-4 py-3 text-xs font-medium text-muted-foreground">الحالة</th>
                     </tr>
                   </thead>
