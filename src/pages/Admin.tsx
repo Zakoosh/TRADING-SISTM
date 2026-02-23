@@ -652,9 +652,9 @@ export default function Admin() {
                 { label: 'إجمالي التقييمات', value: evaluationScores.length },
                 { label: 'إجمالي الصفقات (محاكاة)', value: simulatorTrades.length },
                 { label: 'سجلات النظام', value: systemLogs.length },
-                { label: 'حالة OpenAI (ChatGPT)', value: import.meta.env.VITE_OPENAI_API_KEY ? '✅ مُهيأ' : '⚠️ غير مُهيأ' },
-                { label: 'حالة Twelve Data', value: import.meta.env.VITE_TWELVE_DATA_API_KEY ? '✅ مُهيأ' : '⚠️ غير مُهيأ' },
-                { label: 'حالة Alpaca', value: import.meta.env.VITE_ALPACA_API_KEY ? '✅ مُهيأ' : '⚠️ غير مُهيأ' },
+                { label: 'حالة OpenAI (ChatGPT)', value: (form.openaiApiKey || import.meta.env.VITE_OPENAI_API_KEY) ? '✅ مُهيأ' : '⚠️ غير مُهيأ' },
+                { label: 'حالة Twelve Data', value: (form.twelveDataApiKey || import.meta.env.VITE_TWELVE_DATA_API_KEY) ? '✅ مُهيأ' : '⚠️ غير مُهيأ' },
+                { label: 'حالة Alpaca', value: (form.alpacaApiKey || import.meta.env.VITE_ALPACA_API_KEY) ? '✅ مُهيأ' : '⚠️ غير مُهيأ' },
               ].map(item => (
                 <div key={item.label} className="flex justify-between py-2 border-b border-border last:border-0">
                   <span className="text-sm text-muted-foreground">{item.label}</span>

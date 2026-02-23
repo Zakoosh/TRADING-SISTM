@@ -329,9 +329,9 @@ export default function AIAnalyzer() {
           📈 Twelve Data: {tdConfigured ? `${remainingCredits} كريدت متبقي اليوم` : 'غير مُهيأ (بيانات تجريبية)'}
         </div>
         <div className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full border',
-          import.meta.env.VITE_OPENAI_API_KEY ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
+          (settings?.openaiApiKey || import.meta.env.VITE_OPENAI_API_KEY) ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
         )}>
-          🤖 OpenAI: {import.meta.env.VITE_OPENAI_API_KEY ? 'gpt-4o-mini ✅' : 'غير مُهيأ (تحليل محلي)'}
+          🤖 OpenAI: {(settings?.openaiApiKey || import.meta.env.VITE_OPENAI_API_KEY) ? 'gpt-4o-mini ✅' : 'غير مُهيأ (تحليل محلي)'}
         </div>
       </div>
 

@@ -18,6 +18,8 @@ import {
   saveSystemLog,
 } from '@/lib/supabase'
 import { runAnalysisPipeline } from '@/lib/analysisPipeline'
+import { setOpenAIApiKey } from '@/lib/openai'
+import { setTwelveDataApiKey } from '@/lib/marketData'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,6 +81,11 @@ function AppInit() {
     addRealTrade,
     setSettings,
   } = useAppStore()
+
+  useEffect(() => {
+    if (settings?.openaiApiKey) setOpenAIApiKey(settings.openaiApiKey)
+    if (settings?.twelveDataApiKey) setTwelveDataApiKey(settings.twelveDataApiKey)
+  }, [settings?.openaiApiKey, settings?.twelveDataApiKey])
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return
