@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { AIAnalysis, EvaluationScore, SimulatorTrade, UserSettings, WatchlistItem } from '../types'
+import { AIAnalysis, EvaluationScore, RealTrade, SimulatorTrade, UserSettings, WatchlistItem } from '../types'
 
 interface AppState {
   // Auth
@@ -29,6 +29,11 @@ interface AppState {
   addSimulatorTrade: (trade: SimulatorTrade) => void
   simulatorCash: number
   setSimulatorCash: (cash: number) => void
+
+  // Real Trading (persisted records)
+  realTrades: RealTrade[]
+  setRealTrades: (trades: RealTrade[]) => void
+  addRealTrade: (trade: RealTrade) => void
 
   // Settings
   settings: UserSettings | null
@@ -87,6 +92,13 @@ export const useAppStore = create<AppState>()(
       simulatorCash: 100000,
       setSimulatorCash: (simulatorCash) => set({ simulatorCash }),
 
+      // Real Trading
+      realTrades: [],
+      setRealTrades: (realTrades) => set({ realTrades }),
+      addRealTrade: (trade) => set((state) => ({
+        realTrades: [trade, ...state.realTrades]
+      })),
+
       // Settings
       settings: null,
       setSettings: (settings) => set({ settings }),
@@ -107,6 +119,7 @@ export const useAppStore = create<AppState>()(
         watchlist: state.watchlist,
         simulatorCash: state.simulatorCash,
         simulatorTrades: state.simulatorTrades,
+        realTrades: state.realTrades,
         settings: state.settings,
         sidebarOpen: state.sidebarOpen,
       }),

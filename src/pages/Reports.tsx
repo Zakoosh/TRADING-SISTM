@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { useAppStore } from '@/store'
 import { sendDailyReport } from '@/lib/telegram'
 import { cn, formatCurrency, formatPercent, getChangeColor, formatDate } from '@/lib/utils'
+import { AIInsightPanel } from '@/components/AIInsightPanel'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, AreaChart, Area
@@ -92,8 +93,103 @@ export default function Reports() {
     }
   }
 
+  const toCsvValue = (value: string | number | boolean | null | undefined) => {
+    const raw = String(value ?? '')
+    return `"${raw.replace(/"/g, '""')}"`
+  }
+
+  const downloadCsv = (name: string, headers: string[], rows: Array<Array<string | number | boolean | null | undefined>>) => {
+    const headerRow = headers.map(toCsvValue).join(',')
+    const bodyRows = rows.map(row => row.map(toCsvValue).join(',')).join('\n')
+    const csv = [headerRow, bodyRows].filter(Boolean).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    link.href = url
+    link.download = `${name}-${stamp}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExport = () => {
+    if (activeTab === 'overview') {
+      downloadCsv(
+        'overview-report',
+        ['metric', 'value'],
+        [
+          ['total_analyses', totalAnalyses],
+          ['buy_signals', buySignals],
+          ['sell_signals', sellSignals],
+          ['hold_signals', holdSignals],
+          ['avg_confidence', Number(avgConfidence.toFixed(2))],
+          ['avg_score', Number(avgScore.toFixed(2))],
+          ['portfolio_value', Number(portfolioValue.toFixed(2))],
+          ['total_pnl', Number(totalPnl.toFixed(2))],
+          ['win_rate', Number(winRate.toFixed(2))],
+        ]
+      )
+      return
+    }
+
+    if (activeTab === 'signals') {
+      downloadCsv(
+        'signals-report',
+        ['symbol', 'name', 'signal', 'confidence', 'price', 'target_price', 'stop_loss', 'created_at'],
+        analyses.map(a => [
+          a.symbol,
+          a.name,
+          a.signal,
+          Number(a.confidence.toFixed(2)),
+          Number(a.price.toFixed(4)),
+          Number(a.targetPrice.toFixed(4)),
+          Number(a.stopLoss.toFixed(4)),
+          a.createdAt,
+        ])
+      )
+      return
+    }
+
+    downloadCsv(
+      'trading-report',
+      ['symbol', 'type', 'quantity', 'price', 'close_price', 'pnl', 'status', 'created_at', 'closed_at'],
+      simulatorTrades.map(t => [
+        t.symbol,
+        t.type,
+        Number(t.quantity.toFixed(6)),
+        Number(t.price.toFixed(4)),
+        t.closePrice !== undefined ? Number(t.closePrice.toFixed(4)) : '',
+        t.pnl !== undefined ? Number(t.pnl.toFixed(4)) : '',
+        t.status,
+        t.createdAt,
+        t.closedAt || '',
+      ])
+    )
+  }
+
+  const reportInsights = [
+    winRate >= 55
+      ? `معدل النجاح ${winRate.toFixed(1)}% ممتاز لاستمرار الأتمتة بنفس الإعدادات.`
+      : `معدل النجاح ${winRate.toFixed(1)}% يحتاج ضبط حد القبول أو تخفيض حجم المراكز.`,
+    avgConfidence >= 75
+      ? `ثقة التحليل ${avgConfidence.toFixed(1)} تدعم توسيع نطاق التحليل.`
+      : `ثقة التحليل ${avgConfidence.toFixed(1)} منخفضة نسبيًا؛ ركّز على الأسهم الأعلى سيولة.`,
+    totalPnl >= 0
+      ? 'الأداء المالي إيجابي؛ استمر بالمراجعة اليومية للتقارير.'
+      : 'الأداء المالي سلبي؛ فعّل إرسال الإشارات القوية فقط لتقليل المخاطر.',
+  ]
+
   return (
     <div className="space-y-6">
+      <AIInsightPanel
+        title="توصيات AI للتقارير"
+        insights={reportInsights}
+        ctaTo="/evaluator"
+        ctaLabel="مراجعة التقييمات"
+      />
+
       {/* Header Actions */}
       <div className="flex gap-3">
         {['overview', 'signals', 'trading'].map(tab => (
@@ -106,6 +202,15 @@ export default function Reports() {
             {tab === 'overview' ? 'نظرة عامة' : tab === 'signals' ? 'الإشارات' : 'التداول'}
           </Button>
         ))}
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={handleExport}
+        >
+          <Download className="w-4 h-4" />
+          تصدير CSV
+        </Button>
         <Button
           variant="outline"
           size="sm"

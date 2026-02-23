@@ -65,7 +65,7 @@ const rateLimiter = new RateLimiter()
 interface CacheEntry<T> { data: T; expiresAt: number }
 const priceCache = new Map<string, CacheEntry<number>>()
 const quoteCache = new Map<string, CacheEntry<Stock>>()
-const TTL = 5 * 60 * 1000
+const TTL = 90 * 1000
 
 function getCached<T>(map: Map<string, CacheEntry<T>>, key: string): T | null {
   const e = map.get(key)
@@ -237,7 +237,7 @@ export async function fetchMarketData(
           }
           const stock: Stock = {
             symbol: s.symbol, name: s.name, market: s.market, currency: s.currency,
-            price:         parseFloat(q.close || q.price || '0') || mockPrice(s.symbol, s.market),
+            price:         parseFloat(q.price || q.close || '0') || mockPrice(s.symbol, s.market),
             change:        parseFloat(q.change || '0'),
             changePercent: parseFloat(q.percent_change || '0'),
             volume:        parseInt(q.volume || '0', 10),

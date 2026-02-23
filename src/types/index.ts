@@ -175,6 +175,20 @@ export interface AlpacaOrder {
   filled_avg_price?: number;
 }
 
+export interface RealTrade {
+  id: string;
+  user_id: string;
+  alpaca_order_id?: string;
+  symbol: string;
+  type: 'BUY' | 'SELL';
+  quantity: number;
+  price?: number;
+  total?: number;
+  status: string;
+  analysis_id?: string;
+  createdAt: string;
+}
+
 // Reports Types
 export interface DailyReport {
   id: string;

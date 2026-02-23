@@ -16,12 +16,13 @@ import {
   isAlpacaConfigured
 } from '@/lib/alpaca'
 import { sendTradeNotification } from '@/lib/telegram'
+import { saveRealTrade, saveSystemLog } from '@/lib/supabase'
 import { cn, formatCurrency, formatPercent, getChangeColor } from '@/lib/utils'
-import { AlpacaAccount, AlpacaPosition, AlpacaOrder } from '@/types'
+import { AlpacaAccount, AlpacaPosition, AlpacaOrder, RealTrade } from '@/types'
 import { DEFAULT_STOCKS } from '@/lib/marketData'
 
 export default function RealTrading() {
-  const { settings } = useAppStore()
+  const { user, settings, realTrades, addRealTrade } = useAppStore()
   const [account, setAccount] = useState<AlpacaAccount | null>(null)
   const [positions, setPositions] = useState<AlpacaPosition[]>([])
   const [orders, setOrders] = useState<AlpacaOrder[]>([])
@@ -34,7 +35,7 @@ export default function RealTrading() {
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market')
   const [limitPrice, setLimitPrice] = useState('')
   const [placing, setPlacing] = useState(false)
-  const [activeTab, setActiveTab] = useState<'positions' | 'orders'>('positions')
+  const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'history'>('positions')
 
   const configured = isAlpacaConfigured() || !!(settings?.alpacaApiKey && settings?.alpacaSecretKey)
 
@@ -86,6 +87,36 @@ export default function RealTrading() {
         apiKey, secretKey, baseUrl
       )
 
+      const tradeRecord: RealTrade = {
+        id: crypto.randomUUID(),
+        user_id: user?.id || 'local',
+        alpaca_order_id: order.id,
+        symbol: orderSymbol,
+        type: orderSide === 'buy' ? 'BUY' : 'SELL',
+        quantity: qty,
+        price: order.filled_avg_price ? Number(order.filled_avg_price) : price,
+        total: (order.filled_avg_price ? Number(order.filled_avg_price) : (price || 0)) * qty,
+        status: order.status,
+        createdAt: new Date().toISOString(),
+      }
+      addRealTrade(tradeRecord)
+      if (user?.id) {
+        await saveRealTrade(tradeRecord, user.id)
+        await saveSystemLog({
+          user_id: user.id,
+          action_type: 'REAL_ORDER_PLACED',
+          entity_type: 'REAL_TRADE',
+          entity_id: tradeRecord.id,
+          status: 'SUCCESS',
+          payload: {
+            symbol: tradeRecord.symbol,
+            type: tradeRecord.type,
+            quantity: tradeRecord.quantity,
+            status: tradeRecord.status,
+          },
+        })
+      }
+
       await sendTradeNotification(
         orderSymbol, orderSide === 'buy' ? 'BUY' : 'SELL',
         qty, price || 0, qty * (price || 0), 'REAL'
@@ -101,17 +132,51 @@ export default function RealTrading() {
     } finally {
       setPlacing(false)
     }
-  }, [orderSymbol, orderQty, orderSide, orderType, limitPrice, getCredentials, loadData])
+  }, [orderSymbol, orderQty, orderSide, orderType, limitPrice, getCredentials, loadData, addRealTrade, user?.id])
 
   const handleClosePosition = useCallback(async (symbol: string) => {
     try {
       const { apiKey, secretKey, baseUrl } = getCredentials()
-      await closeAlpacaPosition(symbol, apiKey, secretKey, baseUrl)
+      const order = await closeAlpacaPosition(symbol, apiKey, secretKey, baseUrl)
+
+      const position = positions.find(p => p.symbol === symbol)
+      const qty = position ? Number(position.qty) : 0
+      const price = order.filled_avg_price ? Number(order.filled_avg_price) : undefined
+
+      const tradeRecord: RealTrade = {
+        id: crypto.randomUUID(),
+        user_id: user?.id || 'local',
+        alpaca_order_id: order.id,
+        symbol,
+        type: 'SELL',
+        quantity: qty,
+        price,
+        total: price !== undefined ? price * qty : undefined,
+        status: order.status,
+        createdAt: new Date().toISOString(),
+      }
+      addRealTrade(tradeRecord)
+      if (user?.id) {
+        await saveRealTrade(tradeRecord, user.id)
+        await saveSystemLog({
+          user_id: user.id,
+          action_type: 'REAL_POSITION_CLOSED',
+          entity_type: 'REAL_TRADE',
+          entity_id: tradeRecord.id,
+          status: 'SUCCESS',
+          payload: {
+            symbol: tradeRecord.symbol,
+            quantity: tradeRecord.quantity,
+            status: tradeRecord.status,
+          },
+        })
+      }
+
       await loadData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'خطأ في إغلاق المركز')
     }
-  }, [getCredentials, loadData])
+  }, [getCredentials, positions, loadData, addRealTrade, user?.id])
 
   if (!configured) {
     return (
@@ -189,14 +254,18 @@ export default function RealTrading() {
       {/* Controls */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex gap-2">
-          {['positions', 'orders'].map(tab => (
+          {['positions', 'orders', 'history'].map(tab => (
             <Button
               key={tab}
               variant={activeTab === tab ? 'default' : 'outline'}
               size="sm"
               onClick={() => setActiveTab(tab as typeof activeTab)}
             >
-              {tab === 'positions' ? `المراكز (${positions.length})` : `الأوامر (${orders.length})`}
+              {tab === 'positions'
+                ? `المراكز (${positions.length})`
+                : tab === 'orders'
+                  ? `الأوامر (${orders.length})`
+                  : `سجل التداول (${realTrades.length})`}
             </Button>
           ))}
         </div>
@@ -370,6 +439,51 @@ export default function RealTrading() {
                         <td className="px-4 py-3 text-left text-sm">{order.type}</td>
                         <td className="px-4 py-3 text-center">
                           <Badge variant="secondary">{order.status}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'history' && (
+        <Card className="glass">
+          <CardContent className="p-0">
+            {realTrades.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>لا توجد سجلات تداول حقيقي بعد</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">الرمز</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">النوع</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">الكمية</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">السعر</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">الإجمالي</th>
+                      <th className="text-center px-4 py-3 text-xs font-medium text-muted-foreground">الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {realTrades.map(trade => (
+                      <tr key={trade.id} className="hover:bg-accent/30">
+                        <td className="px-4 py-3 font-bold text-sm">{trade.symbol}</td>
+                        <td className="px-4 py-3">
+                          <Badge className={trade.type === 'BUY' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}>
+                            {trade.type === 'BUY' ? 'شراء' : 'بيع'}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-left text-sm">{trade.quantity}</td>
+                        <td className="px-4 py-3 text-left text-sm">{trade.price !== undefined ? formatCurrency(trade.price) : '—'}</td>
+                        <td className="px-4 py-3 text-left text-sm">{trade.total !== undefined ? formatCurrency(trade.total) : '—'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge variant="secondary">{trade.status}</Badge>
                         </td>
                       </tr>
                     ))}

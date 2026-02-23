@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress'
 import { useAppStore } from '@/store'
 import { fetchMarketData, DEFAULT_STOCKS } from '@/lib/marketData'
 import { cn, formatCurrency, formatPercent, getChangeColor, getSignalBg } from '@/lib/utils'
+import { AIInsightPanel } from '@/components/AIInsightPanel'
 import { Stock } from '@/types'
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -76,9 +77,13 @@ export default function Home() {
   const loadMarketData = useCallback(async () => {
     setLoading(true)
     try {
-      const usStocks = DEFAULT_STOCKS.US.slice(0, 6).map(s => ({ ...s, market: 'US' as const }))
-      const cryptos = DEFAULT_STOCKS.CRYPTO.slice(0, 4).map(s => ({ ...s, market: 'CRYPTO' as const }))
-      const stocks = await fetchMarketData([...usStocks, ...cryptos])
+      const globalOverviewSymbols = [
+        ...DEFAULT_STOCKS.INDEX.filter(s => ['SPX', 'DJI', 'IXIC', 'FTSE', 'DAX'].includes(s.symbol)).map(s => ({ ...s, market: 'INDEX' as const })),
+        ...DEFAULT_STOCKS.COMMODITY.filter(s => ['XAU/USD', 'XAG/USD'].includes(s.symbol)).map(s => ({ ...s, market: 'COMMODITY' as const })),
+        ...DEFAULT_STOCKS.CRYPTO.filter(s => s.symbol === 'BTC/USD').map(s => ({ ...s, market: 'CRYPTO' as const })),
+      ]
+
+      const stocks = await fetchMarketData(globalOverviewSymbols)
       setTopStocks(stocks)
       setLastRefresh(new Date())
     } finally {
@@ -104,6 +109,18 @@ export default function Home() {
   const avgScore = evaluationScores.length > 0
     ? evaluationScores.reduce((sum, s) => sum + s.totalScore, 0) / evaluationScores.length
     : 0
+
+  const aiInsights = [
+    strongSignals > 0
+      ? `لديك ${strongSignals} إشارة قوية؛ يفضّل تمريرها تلقائيًا إلى المحاكي.`
+      : 'لا توجد إشارات قوية حالياً؛ زد نطاق التحليل أو اختر السوق الأمريكي.',
+    avgScore >= 75
+      ? `متوسط التقييم ${avgScore.toFixed(0)} جيد ويشير إلى جودة إشارات مرتفعة.`
+      : `متوسط التقييم ${avgScore.toFixed(0)} منخفض؛ راقب RSI/MACD قبل تنفيذ أي صفقة.`,
+    openTrades.length > 6
+      ? 'المراكز المفتوحة مرتفعة؛ قلل التعرض أو ارفع حد التصنيف قبل الدخول.'
+      : 'يمكنك زيادة الأتمتة تدريجيًا مع إبقاء حد المخاطرة الحالي.',
+  ]
 
   return (
     <div className="space-y-6">
@@ -147,7 +164,7 @@ export default function Home() {
         <div className="lg:col-span-2">
           <Card className="glass">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-lg">نظرة السوق</CardTitle>
+              <CardTitle className="text-lg">النظرة العامة العالمية</CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
@@ -192,6 +209,8 @@ export default function Home() {
 
         {/* Quick Actions & Recent Signals */}
         <div className="space-y-4">
+          <AIInsightPanel insights={aiInsights} ctaTo="/analyzer" ctaLabel="تشغيل التحليل الذكي" />
+
           {/* Quick Actions */}
           <Card className="glass">
             <CardHeader className="pb-3">

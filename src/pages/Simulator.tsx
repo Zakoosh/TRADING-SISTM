@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAppStore } from '@/store'
 import { fetchStockPrice, DEFAULT_STOCKS } from '@/lib/marketData'
 import { sendTradeNotification } from '@/lib/telegram'
-import { saveSimulatorTrade } from '@/lib/supabase'
+import { saveSimulatorTrade, saveSystemLog } from '@/lib/supabase'
 import { cn, formatCurrency, formatPercent, getChangeColor } from '@/lib/utils'
 import { SimulatorTrade, MarketType } from '@/types'
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts'
@@ -71,9 +71,10 @@ export default function Simulator() {
     }
 
     const stockInfo = Object.values(DEFAULT_STOCKS).flat().find(s => s.symbol === selectedSymbol)
+    const userId = user?.id || 'local'
     const trade: SimulatorTrade = {
       id: crypto.randomUUID(),
-      user_id: 'local',
+      user_id: userId,
       symbol: selectedSymbol,
       name: stockInfo?.name || selectedSymbol,
       market: selectedMarket,
@@ -95,6 +96,22 @@ export default function Simulator() {
 
     // Save to Supabase in background
     if (user?.id) saveSimulatorTrade(trade, user.id).catch(console.warn)
+    if (user?.id) {
+      saveSystemLog({
+        user_id: user.id,
+        action_type: 'SIMULATOR_TRADE_OPENED',
+        entity_type: 'SIMULATOR_TRADE',
+        entity_id: trade.id,
+        status: 'SUCCESS',
+        payload: {
+          symbol: trade.symbol,
+          type: trade.type,
+          quantity: trade.quantity,
+          price: trade.price,
+          total: trade.total,
+        },
+      }).catch(console.warn)
+    }
 
     // Send Telegram notification
     await sendTradeNotification(selectedSymbol, tradeType, qty, currentPrice, total, 'SIMULATOR')
@@ -103,7 +120,7 @@ export default function Simulator() {
     setSelectedSymbol('')
     setQuantity('')
     setCurrentPrice(null)
-  }, [selectedSymbol, quantity, currentPrice, tradeType, simulatorCash, addSimulatorTrade, setSimulatorCash])
+  }, [selectedSymbol, quantity, currentPrice, tradeType, simulatorCash, selectedMarket, user?.id, addSimulatorTrade, setSimulatorCash])
 
   const closeTrade = useCallback(async (trade: SimulatorTrade) => {
     const closePrice = await fetchStockPrice(trade.symbol, trade.market)
@@ -115,9 +132,27 @@ export default function Simulator() {
         ? { ...t, status: 'CLOSED' as const, closePrice, pnl, pnlPercent, closedAt: new Date().toISOString() }
         : t
     )
+    const closedTrade = updatedTrades.find(t => t.id === trade.id)
     setSimulatorTrades(updatedTrades)
     setSimulatorCash(simulatorCash + (trade.type === 'BUY' ? closePrice * trade.quantity : trade.total - closePrice * trade.quantity))
-  }, [simulatorTrades, simulatorCash, setSimulatorTrades, setSimulatorCash])
+
+    if (user?.id && closedTrade) {
+      await saveSimulatorTrade(closedTrade, user.id)
+      await saveSystemLog({
+        user_id: user.id,
+        action_type: 'SIMULATOR_TRADE_CLOSED',
+        entity_type: 'SIMULATOR_TRADE',
+        entity_id: closedTrade.id,
+        status: 'SUCCESS',
+        payload: {
+          symbol: closedTrade.symbol,
+          closePrice: closedTrade.closePrice,
+          pnl: closedTrade.pnl,
+          pnlPercent: closedTrade.pnlPercent,
+        },
+      })
+    }
+  }, [simulatorTrades, simulatorCash, setSimulatorTrades, setSimulatorCash, user?.id])
 
   const filteredTrades = simulatorTrades.filter(t => {
     if (filter === 'OPEN') return t.status === 'OPEN'

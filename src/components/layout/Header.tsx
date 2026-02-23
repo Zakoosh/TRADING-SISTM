@@ -1,8 +1,10 @@
-import { Bell, User, Wifi, WifiOff } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Bell, LogOut, Wifi, WifiOff, Bot, Clock3, CheckCircle2, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
+import { signOut } from '@/lib/supabase'
 
 interface HeaderProps {
   title: string
@@ -10,7 +12,32 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle }: HeaderProps) {
-  const { sidebarOpen, analyses, autoAnalysisActive } = useAppStore()
+  const { sidebarOpen, analyses, settings, user } = useAppStore()
+  const [tick, setTick] = useState(Date.now())
+
+  useEffect(() => {
+    const timer = setInterval(() => setTick(Date.now()), 30000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const autoAnalysisActive = !!settings?.autoAnalysis
+  const analysisInterval = Math.max(60, Number(settings?.analysisInterval || 60))
+
+  const automationStatus = localStorage.getItem('automation:lastStatus') || 'IDLE'
+  const automationMessage = localStorage.getItem('automation:lastMessage') || 'لا يوجد تشغيل حتى الآن'
+  const lastFinishedAt = localStorage.getItem('automation:lastFinishedAt')
+
+  const nextRunLabel = useMemo(() => {
+    const lastRun = Number(localStorage.getItem(`auto-analysis-last-run-${useAppStore.getState().user?.id || 'anon'}`) || '0')
+    if (!autoAnalysisActive) return 'متوقف'
+    if (!lastRun) return 'قريبًا'
+
+    const nextRun = lastRun + analysisInterval * 60 * 1000
+    const diff = Math.max(0, nextRun - tick)
+    const min = Math.floor(diff / 60000)
+    return `${min} دقيقة`
+  }, [autoAnalysisActive, analysisInterval, tick])
+
   const recentSignals = analyses.filter(a => {
     const age = Date.now() - new Date(a.createdAt).getTime()
     return age < 3600000 // last hour
@@ -35,6 +62,14 @@ export function Header({ title, subtitle }: HeaderProps) {
 
         {/* Right Side */}
         <div className="flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border border-border bg-card/50">
+            <Bot className="w-3.5 h-3.5 text-primary" />
+            <span className="text-muted-foreground">{automationMessage}</span>
+            {automationStatus === 'SUCCESS' && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
+            {automationStatus === 'FAILED' && <XCircle className="w-3.5 h-3.5 text-red-500" />}
+            {lastFinishedAt && <span className="text-[10px] text-muted-foreground">{new Date(lastFinishedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>}
+          </div>
+
           {/* Auto Analysis Status */}
           <div className={cn(
             'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border',
@@ -47,6 +82,11 @@ export function Header({ title, subtitle }: HeaderProps) {
             ) : (
               <><WifiOff className="w-3 h-3" /><span>تحليل يدوي</span></>
             )}
+          </div>
+
+          <div className="hidden md:flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-border text-muted-foreground">
+            <Clock3 className="w-3 h-3" />
+            <span>القادم: {nextRunLabel}</span>
           </div>
 
           {/* Notifications */}
@@ -63,8 +103,8 @@ export function Header({ title, subtitle }: HeaderProps) {
           </Button>
 
           {/* User */}
-          <Button variant="ghost" size="icon">
-            <User className="w-5 h-5" />
+          <Button variant="ghost" size="icon" title={user?.email || 'User'} onClick={() => signOut().catch(console.warn)}>
+            <LogOut className="w-5 h-5" />
           </Button>
         </div>
       </div>

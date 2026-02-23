@@ -6,12 +6,13 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAppStore } from '@/store'
-import { analyzeStockWithAI } from '@/lib/openai'
-import { DEFAULT_STOCKS, fetchMarketData, getRemainingCredits, isTwelveDataConfigured } from '@/lib/marketData'
+import { getRemainingCredits, isTwelveDataConfigured } from '@/lib/marketData'
+import { runAnalysisPipeline, type AnalysisScope } from '@/lib/analysisPipeline'
 import { sendStatusUpdate } from '@/lib/telegram'
-import { saveAnalysis } from '@/lib/supabase'
+import { saveSystemLog, saveUserSettings, saveSimulatorPortfolio } from '@/lib/supabase'
 import { cn, formatCurrency, formatPercent, getSignalBg, formatDate } from '@/lib/utils'
-import { AIAnalysis, MarketType } from '@/types'
+import { AIInsightPanel } from '@/components/AIInsightPanel'
+import { AIAnalysis } from '@/types'
 
 const SIGNAL_ICONS = {
   BUY: TrendingUp,
@@ -148,71 +149,142 @@ function AnalysisCard({ analysis, expanded, onToggle }: {
 }
 
 export default function AIAnalyzer() {
-  const { analyses, addAnalysis, setIsAnalyzing, isAnalyzing, autoAnalysisActive, setAutoAnalysisActive, user } = useAppStore()
-  const [selectedMarket, setSelectedMarket] = useState<MarketType>('US')
+  const {
+    user,
+    settings,
+    watchlist,
+    analyses,
+    simulatorTrades,
+    simulatorCash,
+    addAnalysis,
+    addEvaluationScore,
+    addSimulatorTrade,
+    addRealTrade,
+    setSimulatorCash,
+    setSettings,
+    setIsAnalyzing,
+    isAnalyzing,
+  } = useAppStore()
+  const [analysisScope, setAnalysisScope] = useState<AnalysisScope>('WATCHLIST')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const [statusMsg, setStatusMsg] = useState('')
   const [filterSignal, setFilterSignal] = useState<string>('ALL')
 
-  const runAnalysis = useCallback(async (market?: MarketType) => {
-    if (isAnalyzing) return
+  const runAnalysis = useCallback(async (scope?: AnalysisScope) => {
+    if (isAnalyzing || !user?.id) return
     setIsAnalyzing(true)
     setProgress(0)
-    setStatusMsg('جاري تحميل بيانات السوق...')
+    setStatusMsg('بدء دورة التحليل الذكي...')
 
     try {
-      const targetMarket = market || selectedMarket
-      const defaultStocks = DEFAULT_STOCKS[targetMarket]?.slice(0, 8) || []
-      const stockList = defaultStocks.map(s => ({ ...s, market: targetMarket }))
+      await saveSystemLog({
+        user_id: user.id,
+        action_type: 'MANUAL_ANALYSIS_STARTED',
+        entity_type: 'ANALYZER',
+        status: 'INFO',
+        payload: { scope: scope || analysisScope, watchlistSize: watchlist.length },
+      })
 
-      setStatusMsg('جاري تحديث الأسعار...')
-      setProgress(20)
+      const result = await runAnalysisPipeline({
+        userId: user.id,
+        scope: scope || analysisScope,
+        watchlist,
+        settings,
+        simulatorCash,
+        onAnalysis: (analysis) => addAnalysis(analysis),
+        onEvaluation: (score) => addEvaluationScore(score),
+        onSimulatorTrade: (trade, nextCash) => {
+          addSimulatorTrade(trade)
+          setSimulatorCash(nextCash)
+        },
+        onRealTrade: (trade) => addRealTrade(trade),
+        existingSimulatorTrades: simulatorTrades,
+        onProgress: (message, value) => {
+          setStatusMsg(message)
+          setProgress(value)
+        },
+      })
 
-      const stocksWithPrices = await fetchMarketData(stockList)
-      setProgress(40)
-
-      setStatusMsg('جاري تحليل الأسهم بالذكاء الاصطناعي...')
-
-      const results: AIAnalysis[] = []
-      for (let i = 0; i < stocksWithPrices.length; i++) {
-        const stock = stocksWithPrices[i]
-        setStatusMsg(`تحليل ${stock.symbol}... (${i + 1}/${stocksWithPrices.length})`)
-        const analysis = await analyzeStockWithAI(stock.symbol, stock.name, targetMarket, stock.price)
-        results.push(analysis)
-        addAnalysis(analysis)
-        // Save to Supabase in background
-        if (user?.id) saveAnalysis(analysis, user.id).catch(console.warn)
-        setProgress(40 + ((i + 1) / stocksWithPrices.length) * 50)
-        await new Promise(r => setTimeout(r, 300))
-      }
+      await saveSimulatorPortfolio(
+        user.id,
+        result.nextSimulatorCash,
+        result.simulatorTrades.filter(t => t.status === 'OPEN').reduce((sum, t) => sum + t.total, 0)
+      )
 
       setProgress(100)
-      setStatusMsg(`اكتمل التحليل! ${results.length} سهم تم تحليله`)
+      setStatusMsg(`اكتمل التحليل! ${result.analyses.length} سهم تم تحليله`)
 
       // Send status to Telegram
-      const strongCount = results.filter(r => r.confidence >= 75).length
-      await sendStatusUpdate(results.length, strongCount, 0, results.reduce((s, r) => s + r.confidence, 0) / results.length, true)
+      const strongCount = result.scores.filter(s => s.passed).length
+      const avgConfidence = result.analyses.length > 0
+        ? result.analyses.reduce((s, r) => s + r.confidence, 0) / result.analyses.length
+        : 0
+      await sendStatusUpdate(result.analyses.length, strongCount, 0, avgConfidence, true)
+      await saveSystemLog({
+        user_id: user.id,
+        action_type: 'MANUAL_ANALYSIS_SUCCESS',
+        entity_type: 'ANALYZER',
+        status: 'SUCCESS',
+        payload: {
+          analyses: result.analyses.length,
+          evaluations: result.scores.length,
+          simulatorTrades: result.simulatorTrades.length,
+          realTrades: result.realTrades.length,
+        },
+      })
 
     } catch (err) {
       setStatusMsg('حدث خطأ في التحليل')
+      await saveSystemLog({
+        user_id: user.id,
+        action_type: 'MANUAL_ANALYSIS_FAILED',
+        entity_type: 'ANALYZER',
+        status: 'FAILED',
+        payload: { message: err instanceof Error ? err.message : 'Unknown error' },
+      })
       console.error(err)
     } finally {
       setIsAnalyzing(false)
     }
-  }, [isAnalyzing, selectedMarket, addAnalysis, setIsAnalyzing])
+  }, [
+    isAnalyzing,
+    user?.id,
+    settings,
+    watchlist,
+    analysisScope,
+    simulatorTrades,
+    simulatorCash,
+    addAnalysis,
+    addEvaluationScore,
+    addSimulatorTrade,
+    addRealTrade,
+    setSimulatorCash,
+    setIsAnalyzing,
+  ])
 
-  // Auto analysis every hour
-  useEffect(() => {
-    if (!autoAnalysisActive) return
-    const interval = setInterval(() => {
-      const now = new Date()
-      if (now.getMinutes() === 0) {
-        runAnalysis()
-      }
-    }, 60000)
-    return () => clearInterval(interval)
-  }, [autoAnalysisActive, runAnalysis])
+  const autoAnalysisActive = !!settings?.autoAnalysis
+
+  const toggleAutoAnalysis = useCallback(async () => {
+    if (!user?.id) return
+    const next = !autoAnalysisActive
+    const baseSettings = settings || {
+      id: 'local',
+      user_id: user.id,
+      simulatorBalance: 100000,
+      riskLevel: 'MEDIUM' as const,
+      autoAnalysis: false,
+      analysisInterval: 60,
+      minSignalScore: 75,
+      maxPositionSize: 10,
+      enableTelegram: true,
+      enableRealTrading: false,
+      alpacaMode: 'PAPER' as const,
+    }
+    const updated = { ...baseSettings, user_id: user.id, autoAnalysis: next }
+    setSettings(updated)
+    await saveUserSettings(updated)
+  }, [autoAnalysisActive, settings, setSettings, user?.id])
 
   const filteredAnalyses = analyses.filter(a =>
     filterSignal === 'ALL' || a.signal === filterSignal
@@ -228,9 +300,27 @@ export default function AIAnalyzer() {
 
   const remainingCredits = getRemainingCredits()
   const tdConfigured = isTwelveDataConfigured()
+  const analyzerInsights = [
+    autoAnalysisActive
+      ? 'التحليل التلقائي يعمل كل ساعة للمستخدم الحالي ويحدّث الأقسام المرتبطة.'
+      : 'فعّل التحليل التلقائي للحصول على دورة تحليل دون تدخل يدوي.',
+    analysisScope === 'WATCHLIST'
+      ? 'نطاق قائمة المتابعة يقدّم أفضل ملاءمة للإشارات الشخصية.'
+      : `النطاق الحالي (${analysisScope}) يوسّع التغطية ويزيد عدد الفرص.`,
+    analyses.length > 0
+      ? `لديك ${analyses.length} نتيجة متاحة ويمكن تمريرها مباشرة للمقيّم والمحاكي.`
+      : 'لا توجد نتائج حديثة؛ ابدأ التحليل الآن لتغذية باقي الوحدات.',
+  ]
 
   return (
     <div className="space-y-6">
+      <AIInsightPanel
+        title="مساعد التحليل"
+        insights={analyzerInsights}
+        ctaTo="/evaluator"
+        ctaLabel="فتح المقيّم"
+      />
+
       {/* API Status Bar */}
       <div className="flex flex-wrap gap-3 text-xs">
         <div className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full border',
@@ -250,16 +340,15 @@ export default function AIAnalyzer() {
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-3 items-center justify-between">
             <div className="flex gap-3 items-center">
-              <Select value={selectedMarket} onValueChange={v => setSelectedMarket(v as MarketType)}>
+              <Select value={analysisScope} onValueChange={v => setAnalysisScope(v as AnalysisScope)}>
                 <SelectTrigger className="w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="US">🇺🇸 الأسهم الأمريكية</SelectItem>
-                  <SelectItem value="TR">🇹🇷 الأسهم التركية</SelectItem>
-                  <SelectItem value="CRYPTO">💎 العملات الرقمية</SelectItem>
-                  <SelectItem value="COMMODITY">🥇 السلع</SelectItem>
-                  <SelectItem value="INDEX">📊 المؤشرات</SelectItem>
+                  <SelectItem value="WATCHLIST">📋 قائمة المتابعة (المستخدم)</SelectItem>
+                  <SelectItem value="US">🇺🇸 تحليل الأسهم الأمريكية</SelectItem>
+                  <SelectItem value="TR">🇹🇷 تحليل الأسهم التركية</SelectItem>
+                  <SelectItem value="GLOBAL">🌐 تحليل عام للسوق</SelectItem>
                 </SelectContent>
               </Select>
               <Button
@@ -276,7 +365,7 @@ export default function AIAnalyzer() {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setAutoAnalysisActive(!autoAnalysisActive)}
+                onClick={toggleAutoAnalysis}
                 className={cn(
                   'flex items-center gap-2 text-sm px-3 py-2 rounded-lg border transition-all',
                   autoAnalysisActive
@@ -285,7 +374,7 @@ export default function AIAnalyzer() {
                 )}
               >
                 <Zap className="w-4 h-4" />
-                {autoAnalysisActive ? 'تحليل تلقائي: نشط' : 'تحليل تلقائي: متوقف'}
+                {autoAnalysisActive ? 'تحليل تلقائي كل ساعة: نشط' : 'تحليل تلقائي كل ساعة: متوقف'}
               </button>
             </div>
           </div>
