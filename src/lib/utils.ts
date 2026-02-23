@@ -5,38 +5,27 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+function toPlainDigits(value: number, decimals = 0): string {
+  if (!Number.isFinite(value)) return '0'
+  const fixed = value.toFixed(Math.max(0, decimals))
+  return decimals > 0 ? fixed.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1') : fixed
+}
+
 export function formatCurrency(value: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('ar-SA', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
+  void currency
+  return toPlainDigits(value, 2)
 }
 
 export function formatNumber(value: number, decimals: number = 2): string {
-  return new Intl.NumberFormat('ar-SA', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value)
+  return toPlainDigits(value, decimals)
 }
 
 export function formatPercent(value: number): string {
-  const sign = value >= 0 ? '+' : ''
-  return `${sign}${value.toFixed(2)}%`
+  return toPlainDigits(value, 2)
 }
 
 export function formatVolume(volume: number): string {
-  if (volume >= 1_000_000_000) {
-    return `${(volume / 1_000_000_000).toFixed(1)}B`
-  }
-  if (volume >= 1_000_000) {
-    return `${(volume / 1_000_000).toFixed(1)}M`
-  }
-  if (volume >= 1_000) {
-    return `${(volume / 1_000).toFixed(1)}K`
-  }
-  return volume.toString()
+  return toPlainDigits(volume, 0)
 }
 
 export function getChangeColor(value: number): string {

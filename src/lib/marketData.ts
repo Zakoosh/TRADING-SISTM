@@ -3,6 +3,12 @@ import { Stock, MarketType, CandleData } from '../types'
 const TWELVE_DATA_KEY = import.meta.env.VITE_TWELVE_DATA_API_KEY || ''
 const TWELVE_DATA_BASE = 'https://api.twelvedata.com'
 
+let _runtimeApiKey = ''
+
+export function setTwelveDataApiKey(key: string) {
+  _runtimeApiKey = key
+}
+
 // ─── Rate Limiter ─────────────────────────────────────────────────────────────
 // Basic plan: 8 requests/minute, 800 credits/day
 // We enforce 8.5-second gaps between requests (≈7 req/min, safe margin)
@@ -65,7 +71,7 @@ const rateLimiter = new RateLimiter()
 interface CacheEntry<T> { data: T; expiresAt: number }
 const priceCache = new Map<string, CacheEntry<number>>()
 const quoteCache = new Map<string, CacheEntry<Stock>>()
-const TTL = 5 * 60 * 1000
+const TTL = 90 * 1000
 
 function getCached<T>(map: Map<string, CacheEntry<T>>, key: string): T | null {
   const e = map.get(key)
@@ -159,8 +165,13 @@ function generateMockStock(symbol: string, name: string, market: MarketType, cur
   }
 }
 
+function getActiveApiKey(): string {
+  return _runtimeApiKey || TWELVE_DATA_KEY
+}
+
 function isConfigured(): boolean {
-  return !!(TWELVE_DATA_KEY && TWELVE_DATA_KEY !== 'your_twelve_data_api_key')
+  const key = getActiveApiKey()
+  return !!(key && key !== 'your_twelve_data_api_key')
 }
 
 // ─── Fetch single price ───────────────────────────────────────────────────────
@@ -176,7 +187,7 @@ export async function fetchStockPrice(symbol: string, market: MarketType): Promi
   return rateLimiter.throttle(async () => {
     try {
       const res = await fetch(
-        `${TWELVE_DATA_BASE}/price?symbol=${encodeURIComponent(symbol)}&apikey=${TWELVE_DATA_KEY}`
+        `${TWELVE_DATA_BASE}/price?symbol=${encodeURIComponent(symbol)}&apikey=${getActiveApiKey()}`
       )
       const data = await res.json()
       if (data.status === 'error' || !data.price) return mockPrice(symbol, market)
@@ -226,7 +237,7 @@ export async function fetchMarketData(
     const stocks = await rateLimiter.throttle(async () => {
       try {
         const res = await fetch(
-          `${TWELVE_DATA_BASE}/quote?symbol=${encodeURIComponent(symbolList)}&apikey=${TWELVE_DATA_KEY}`
+          `${TWELVE_DATA_BASE}/quote?symbol=${encodeURIComponent(symbolList)}&apikey=${getActiveApiKey()}`
         )
         const data = await res.json()
 
@@ -237,7 +248,7 @@ export async function fetchMarketData(
           }
           const stock: Stock = {
             symbol: s.symbol, name: s.name, market: s.market, currency: s.currency,
-            price:         parseFloat(q.close || q.price || '0') || mockPrice(s.symbol, s.market),
+            price:         parseFloat(q.price || q.close || '0') || mockPrice(s.symbol, s.market),
             change:        parseFloat(q.change || '0'),
             changePercent: parseFloat(q.percent_change || '0'),
             volume:        parseInt(q.volume || '0', 10),
@@ -268,7 +279,7 @@ export async function fetchCandleData(
   return rateLimiter.throttle(async () => {
     try {
       const res = await fetch(
-        `${TWELVE_DATA_BASE}/time_series?symbol=${encodeURIComponent(symbol)}&interval=${interval}&outputsize=${outputSize}&apikey=${TWELVE_DATA_KEY}`
+        `${TWELVE_DATA_BASE}/time_series?symbol=${encodeURIComponent(symbol)}&interval=${interval}&outputsize=${outputSize}&apikey=${getActiveApiKey()}`
       )
       const data = await res.json()
       if (!data.values || data.status === 'error') return generateMockCandles(outputSize)

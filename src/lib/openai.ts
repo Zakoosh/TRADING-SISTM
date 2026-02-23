@@ -2,8 +2,14 @@ import OpenAI from 'openai'
 import { AIAnalysis, MarketType, SignalType, TechnicalIndicators } from '../types'
 import { calculateRSI, calculateMACD, calculateEMA, calculateSMA } from './utils'
 
+let _runtimeApiKey = ''
+
+export function setOpenAIApiKey(key: string) {
+  _runtimeApiKey = key
+}
+
 function getOpenAIClient(): OpenAI | null {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY
+  const apiKey = _runtimeApiKey || import.meta.env.VITE_OPENAI_API_KEY
   if (!apiKey || apiKey === 'your_openai_api_key') return null
   return new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
 }

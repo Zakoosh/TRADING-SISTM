@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { useAppStore } from '@/store'
 import { sendAnalysisSignal } from '@/lib/telegram'
+import { saveEvaluationScore, updateEvaluationSent } from '@/lib/supabase'
 import { cn, formatCurrency, getSignalBg, formatDate } from '@/lib/utils'
 import { AIAnalysis, EvaluationScore } from '@/types'
 
@@ -205,7 +206,7 @@ function EvaluationCard({ analysis, score, onSend }: {
 }
 
 export default function AIEvaluator() {
-  const { analyses, evaluationScores, addEvaluationScore, setEvaluationScores } = useAppStore()
+  const { analyses, evaluationScores, addEvaluationScore, setEvaluationScores, user } = useAppStore()
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [filterPassed, setFilterPassed] = useState<string>('ALL')
   const [scores, setScores] = useState<EvaluationScore[]>(evaluationScores)
@@ -226,11 +227,14 @@ export default function AIEvaluator() {
       const score = evaluateAnalysis(analysis)
       newScores.push(score)
       addEvaluationScore(score)
+      if (user?.id) {
+        await saveEvaluationScore(score, user.id)
+      }
       await new Promise(r => setTimeout(r, 100))
     }
 
     setIsEvaluating(false)
-  }, [analyses, evaluationScores, isEvaluating, addEvaluationScore])
+  }, [analyses, evaluationScores, isEvaluating, addEvaluationScore, user?.id])
 
   const handleSendToTelegram = useCallback(async (score: EvaluationScore, analysis: AIAnalysis) => {
     const success = await sendAnalysisSignal(analysis, score)
@@ -238,8 +242,11 @@ export default function AIEvaluator() {
       const updated = scores.map(s => s.id === score.id ? { ...s, sentToTelegram: true } : s)
       setScores(updated)
       setEvaluationScores(updated)
+      if (user?.id) {
+        await updateEvaluationSent(score.id, true)
+      }
     }
-  }, [scores, setEvaluationScores])
+  }, [scores, setEvaluationScores, user?.id])
 
   const sendAllStrong = useCallback(async () => {
     const strongUnSent = scores.filter(s => s.passed && !s.sentToTelegram)
