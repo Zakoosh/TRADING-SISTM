@@ -141,7 +141,7 @@ export async function analyzeStockWithAI(
       `
       const result = await model.generateContent(prompt)
       const text = result.response.text()
-      const lines = text.split('\n').filter(l => l.trim())
+      const lines = text.split('\n').filter((l: string) => l.trim())
       reasoning = lines.slice(0, 2).join(' ')
       technicalSummary = lines[2] || `المؤشرات تدعم توصية ${signal === 'BUY' ? 'الشراء' : signal === 'SELL' ? 'البيع' : 'الاحتفاظ'}`
       fundamentalSummary = lines[3] || 'التقييم الأساسي معقول بالنسبة للسوق الحالي'
